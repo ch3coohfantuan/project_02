@@ -23,7 +23,7 @@ import '@/permission' // permission control
  * Currently MockJs will be used in the production environment,
  * please remove it before going online ! ! !
  */
-if (process.env.NODE_ENV === 'production') {
+if (process.env.NODE_ENV === 'development') {
   const { mockXHR } = require('../mock')
   mockXHR()
 }
@@ -35,9 +35,17 @@ Vue.use(ElementUI, { locale })
 
 Vue.config.productionTip = false
 
+import CategorySelect from '@/components/CategorySelect'
+import API from '@/api'
+
+Vue.prototype.$api = API
+Vue.component(CategorySelect.name, CategorySelect)
+
 new Vue({
   el: '#app',
   router,
   store,
-  render: h => h(App)
+  render: h => h(App),
+
 })
+

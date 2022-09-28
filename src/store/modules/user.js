@@ -1,12 +1,18 @@
 import { login, logout, getInfo } from '@/api/user'
 import { getToken, setToken, removeToken } from '@/utils/auth'
-import { resetRouter } from '@/router'
+import { resetRouter, asyncRoutes, anyRoutes, constantRoutes } from '@/router'
+import router from '@/router'
 
 const getDefaultState = () => {
   return {
     token: getToken(),
     name: '',
-    avatar: ''
+    avatar: '',
+    routes: [],
+    buttons: [],
+    roles: [],
+    resultAsyncRoutes: [],
+    resultAllRoutes: []
   }
 }
 
@@ -19,63 +25,71 @@ const mutations = {
   SET_TOKEN: (state, token) => {
     state.token = token
   },
-  SET_NAME: (state, name) => {
-    state.name = name
+  SET_USERINFO: (state, data) => {
+    state.name = data.name
+    state.avatar = data.avatar
+    state.routes = data.routes
+    state.buttons = data.buttons
+    state.roles = data.roles
   },
-  SET_AVATAR: (state, avatar) => {
-    state.avatar = avatar
+  SET_RESULTASYNCROUTES: (state, data) => {
+    state.resultAsyncRoutes = data
+    state.resultAllRoutes = constantRoutes.concat(anyRoutes, state.resultAsyncRoutes)
+    router.addRoutes(state.resultAllRoutes)
   }
 }
 
 const actions = {
   // user login
-  login({ commit }, userInfo) {
+  async login({ commit }, userInfo) {
     const { username, password } = userInfo
-    return new Promise((resolve, reject) => {
-      login({ username: username.trim(), password: password }).then(response => {
-        const { data } = response
-        commit('SET_TOKEN', data.token)
-        setToken(data.token)
-        resolve()
-      }).catch(error => {
-        reject(error)
-      })
-    })
+    let result = await login({ username: username.trim(), password: password })
+    if (result.code === 20000) {
+      commit('SET_TOKEN', result.data.token)
+      setToken(result.data.token)
+      return 'ok'
+    } else {
+      return Promise.reject(new Error('fail'))
+    }
   },
 
   // get user info
-  getInfo({ commit, state }) {
-    return new Promise((resolve, reject) => {
-      getInfo(state.token).then(response => {
-        const { data } = response
-
-        if (!data) {
-          return reject('Verification failed, please Login again.')
-        }
-
-        const { name, avatar } = data
-
-        commit('SET_NAME', name)
-        commit('SET_AVATAR', avatar)
-        resolve(data)
-      }).catch(error => {
-        reject(error)
-      })
-    })
+  async getInfo({ commit, state }) {
+    let result = await getInfo(state.token)
+    if (result.code === 20000) {
+      if (!result.data) {
+        return Promise.reject(new Error('Verification failed, please Login again.'))
+      }
+      commit('SET_USERINFO', result.data)
+      const filterRoutes = (asyncRoutes, userRoutes) => {
+        return asyncRoutes.filter(item => {
+          if (userRoutes.indexOf(item.name) != -1) {
+            if (asyncRoutes.children && asyncRoutes.children.length) {
+              filterRoutes(asyncRoutes.children, userRoutes)
+            }
+            return true
+          }
+        })
+      }
+      let routes = filterRoutes(asyncRoutes, result.data.routes)
+      commit('SET_RESULTASYNCROUTES', routes)
+      return 'ok'
+    } else {
+      return Promise.reject(new Error('fail'))
+    }
   },
 
-  // user logout
-  logout({ commit, state }) {
-    return new Promise((resolve, reject) => {
-      logout(state.token).then(() => {
-        removeToken() // must remove  token  first
-        resetRouter()
-        commit('RESET_STATE')
-        resolve()
-      }).catch(error => {
-        reject(error)
-      })
-    })
+  // user logouts
+  async logout({ commit, state }) {
+    let result = await logout(state.token)
+    if (result.code === 20000) {
+      removeToken() // must remove  token  first
+      resetRouter()
+      commit('RESET_STATE')
+      return 'ok'
+    } else {
+      return Promise.reject(new Error('fail'))
+    }
   },
 
   // remove token
