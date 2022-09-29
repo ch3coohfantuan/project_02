@@ -48,6 +48,7 @@
             type="danger"
             icon="el-icon-delete"
             size="mini"
+            @click="$message('正在开发中...')"
           ></el-button>
         </template>
       </el-table-column>
